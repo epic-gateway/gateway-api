@@ -33,7 +33,7 @@ type ExemptFeature string
 
 const (
 	// This option indicates the implementation is exempting itself from the
-	// requirement of a ReferenceGrant to allow cross-namesapce references,
+	// requirement of a ReferenceGrant to allow cross-namespace references,
 	// and has instead implemented alternative safeguards.
 	ExemptReferenceGrant ExemptFeature = "ReferenceGrant"
 )
@@ -45,6 +45,9 @@ type SupportedFeature string
 const (
 	// This option indicates support for the ReferenceGrant object.
 	SupportReferenceGrant SupportedFeature = "ReferenceGrant"
+
+	// This option indicates support for HTTPRoute query param matching (extended conformance).
+	SupportHTTPRouteQueryParamMatching SupportedFeature = "HTTPRouteQueryParamMatching"
 )
 
 // ConformanceTestSuite defines the test suite used to run Gateway API
@@ -176,7 +179,7 @@ func (test *ConformanceTest) Run(t *testing.T, suite *ConformanceTestSuite) {
 	// Check that no features exercised by the test have been opted out of by
 	// the suite.
 	for _, feature := range test.Exemptions {
-		if !slices.Contains(suite.ExemptFeatures, feature) {
+		if slices.Contains(suite.ExemptFeatures, feature) {
 			t.Skipf("Skipping %s: suite exempts %s", test.ShortName, feature)
 		}
 	}

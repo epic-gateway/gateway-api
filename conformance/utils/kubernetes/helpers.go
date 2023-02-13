@@ -36,6 +36,31 @@ import (
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
+// GatewayRef is a tiny type for specifying an HTTP Route ParentRef without
+// relying on a specific api version.
+type GatewayRef struct {
+	types.NamespacedName
+	listenerNames []*v1alpha2.SectionName
+}
+
+// NewGatewayRef creates a GatewayRef resource.  ListenerNames are optional.
+func NewGatewayRef(nn types.NamespacedName, listenerNames ...string) GatewayRef {
+	var listeners []*v1alpha2.SectionName
+
+	if len(listenerNames) == 0 {
+		listenerNames = append(listenerNames, "")
+	}
+
+	for _, listener := range listenerNames {
+		sectionName := v1alpha2.SectionName(listener)
+		listeners = append(listeners, &sectionName)
+	}
+	return GatewayRef{
+		NamespacedName: nn,
+		listenerNames:  listeners,
+	}
+}
+
 // GWCMustBeAccepted waits until the specified GatewayClass has an Accepted
 // condition set to true. It also returns the ControllerName for the
 // GatewayClass. This will cause the test to halt if the specified timeout is
@@ -56,7 +81,8 @@ func GWCMustBeAccepted(t *testing.T, c client.Client, gwcName string, seconds in
 		}
 
 		controllerName = string(gwc.Spec.ControllerName)
-		return findConditionInList(t, gwc.Status.Conditions, "Accepted", "True"), nil
+		// Passing an empty string as the Reason means that any Reason will do.
+		return findConditionInList(t, gwc.Status.Conditions, "Accepted", "True", ""), nil
 	})
 	require.NoErrorf(t, waitErr, "error waiting for %s GatewayClass to have Accepted condition set to True: %v", gwcName, waitErr)
 
@@ -81,7 +107,8 @@ func NamespacesMustBeReady(t *testing.T, c client.Client, namespaces []string, s
 				t.Errorf("Error listing Gateways: %v", err)
 			}
 			for _, gw := range gwList.Items {
-				if !findConditionInList(t, gw.Status.Conditions, "Ready", "True") {
+				// Passing an empty string as the Reason means that any Reason will do.
+				if !findConditionInList(t, gw.Status.Conditions, "Ready", "True", "") {
 					t.Logf("%s/%s Gateway not ready yet", ns, gw.Name)
 					return false, nil
 				}
@@ -110,33 +137,41 @@ func NamespacesMustBeReady(t *testing.T, c client.Client, namespaces []string, s
 // address assigned to it and the Route has a ParentRef referring to the
 // Gateway. The test will fail if these conditions are not met before the
 // timeouts.
-func GatewayAndHTTPRoutesMustBeReady(t *testing.T, c client.Client, controllerName string, gwNN types.NamespacedName, routeNNs ...types.NamespacedName) string {
+func GatewayAndHTTPRoutesMustBeReady(t *testing.T, c client.Client, controllerName string, gw GatewayRef, routeNNs ...types.NamespacedName) string {
 	t.Helper()
 
-	gwAddr, err := WaitForGatewayAddress(t, c, gwNN, 180)
+	gwAddr, err := WaitForGatewayAddress(t, c, gw.NamespacedName, 180)
 	require.NoErrorf(t, err, "timed out waiting for Gateway address to be assigned")
 
-	ns := v1alpha2.Namespace(gwNN.Namespace)
+	ns := v1alpha2.Namespace(gw.Namespace)
 	kind := v1alpha2.Kind("Gateway")
 
 	for _, routeNN := range routeNNs {
 		namespaceRequired := true
-		if routeNN.Namespace == gwNN.Namespace {
+		if routeNN.Namespace == gw.Namespace {
 			namespaceRequired = false
 		}
-		parents := []v1alpha2.RouteParentStatus{{
-			ParentRef: v1alpha2.ParentReference{
-				Group:     (*v1alpha2.Group)(&v1alpha2.GroupVersion.Group),
-				Kind:      &kind,
-				Name:      v1alpha2.ObjectName(gwNN.Name),
-				Namespace: &ns,
-			},
-			ControllerName: v1alpha2.GatewayController(controllerName),
-			Conditions: []metav1.Condition{{
-				Type:   string(v1alpha2.RouteConditionAccepted),
-				Status: metav1.ConditionTrue,
-			}},
-		}}
+
+		var parents []v1alpha2.RouteParentStatus
+		for _, listener := range gw.listenerNames {
+			parents = append(parents, v1alpha2.RouteParentStatus{
+				ParentRef: v1alpha2.ParentReference{
+					Group:       (*v1alpha2.Group)(&v1alpha2.GroupVersion.Group),
+					Kind:        &kind,
+					Name:        v1alpha2.ObjectName(gw.Name),
+					Namespace:   &ns,
+					SectionName: listener,
+				},
+				ControllerName: v1alpha2.GatewayController(controllerName),
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(v1alpha2.RouteConditionAccepted),
+						Status: metav1.ConditionTrue,
+						Reason: string(v1alpha2.RouteReasonAccepted),
+					},
+				},
+			})
+		}
 		HTTPRouteMustHaveParents(t, c, routeNN, parents, namespaceRequired, 60)
 	}
 
@@ -310,6 +345,39 @@ func GatewayStatusMustHaveListeners(t *testing.T, client client.Client, gwNN typ
 	require.NoErrorf(t, waitErr, "error waiting for Gateway status to have listeners matching expectations")
 }
 
+// HTTPRouteMustHaveConditions checks that the supplied HTTPRoute has the supplied Condition,
+// halting after the specified timeout is exceeded.
+func HTTPRouteMustHaveCondition(t *testing.T, client client.Client, routeNN types.NamespacedName, gwNN types.NamespacedName, condition metav1.Condition, seconds int) {
+	t.Helper()
+
+	waitFor := time.Duration(seconds) * time.Second
+	waitErr := wait.PollImmediate(1*time.Second, waitFor, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		route := &v1alpha2.HTTPRoute{}
+		err := client.Get(ctx, routeNN, route)
+		if err != nil {
+			return false, fmt.Errorf("error fetching HTTPRoute: %w", err)
+		}
+
+		parents := route.Status.Parents
+
+		var conditionFound bool
+		for _, parent := range parents {
+			if parent.ParentRef.Name == v1alpha2.ObjectName(gwNN.Name) && (parent.ParentRef.Namespace == nil || string(*parent.ParentRef.Namespace) == gwNN.Namespace) {
+				if findConditionInList(t, parent.Conditions, condition.Type, string(condition.Status), condition.Reason) {
+					conditionFound = true
+				}
+			}
+		}
+
+		return conditionFound, nil
+	})
+
+	require.NoErrorf(t, waitErr, "error waiting for HTTPRoute status to have a Condition matching expectations")
+}
+
 // TODO(mikemorris): this and parentsMatch could possibly be rewritten as a generic function?
 func listenersMatch(t *testing.T, expected, actual []v1alpha2.ListenerStatus) bool {
 	t.Helper()
@@ -349,7 +417,7 @@ func conditionsMatch(t *testing.T, expected, actual []metav1.Condition) bool {
 		return false
 	}
 	for _, condition := range expected {
-		if !findConditionInList(t, actual, condition.Type, string(condition.Status)) {
+		if !findConditionInList(t, actual, condition.Type, string(condition.Status), condition.Reason) {
 			return false
 		}
 	}
@@ -358,13 +426,19 @@ func conditionsMatch(t *testing.T, expected, actual []metav1.Condition) bool {
 	return true
 }
 
-func findConditionInList(t *testing.T, conditions []metav1.Condition, condName, condValue string) bool {
+// findConditionInList finds a condition in a list of Conditions, checking
+// the Name, Value, and Reason. If an empty reason is passed, any Reason will match.
+func findConditionInList(t *testing.T, conditions []metav1.Condition, condName, condValue, condReason string) bool {
 	for _, cond := range conditions {
 		if cond.Type == condName {
-			// TODO(nathancoleman): Compare Reason
 			if cond.Status == metav1.ConditionStatus(condValue) {
-				return true
+				// an empty Reason string means "Match any reason".
+				if condReason == "" || cond.Reason == condReason {
+					return true
+				}
+				t.Logf("%s condition Reason set to %s, expected %s", condName, cond.Reason, condReason)
 			}
+
 			t.Logf("%s condition set to %s, expected %s", condName, cond.Status, condValue)
 		}
 	}

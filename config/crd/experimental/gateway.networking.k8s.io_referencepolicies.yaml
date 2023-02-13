@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1086
-    gateway.networking.k8s.io/bundle-version: v0.5.0-rc1
+    gateway.networking.k8s.io/bundle-version: v0.5.0
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   name: referencepolicies.gateway.networking.k8s.io
@@ -74,9 +74,11 @@ spec:
                       type: string
                     kind:
                       description: "Kind is the kind of the referent. Although implementations
-                        may support additional resources, the following Route types
-                        are part of the \"Core\" support level for this field: \n
-                        * HTTPRoute * TCPRoute * TLSRoute * UDPRoute"
+                        may support additional resources, the following types are
+                        part of the \"Core\" support level for this field. \n When
+                        used to permit a SecretObjectReference: \n * Gateway \n When
+                        used to permit a BackendObjectReference: \n * HTTPRoute *
+                        TCPRoute * TLSRoute * UDPRoute"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
@@ -115,7 +117,9 @@ spec:
                     kind:
                       description: "Kind is the kind of the referent. Although implementations
                         may support additional resources, the following types are
-                        part of the \"Core\" support level for this field: \n * Service"
+                        part of the \"Core\" support level for this field: \n * Secret
+                        when used to permit a SecretObjectReference * Service when
+                        used to permit a BackendObjectReference"
                       maxLength: 63
                       minLength: 1
                       pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
