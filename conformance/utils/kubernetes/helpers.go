@@ -413,7 +413,7 @@ func listenersMatch(t *testing.T, expected, actual []v1alpha2.ListenerStatus) bo
 
 func conditionsMatch(t *testing.T, expected, actual []metav1.Condition) bool {
 	if len(actual) < len(expected) {
-		t.Logf("Expected more conditions to be present")
+		t.Logf("Conditions: expected %d, got %d", len(expected), len(actual))
 		return false
 	}
 	for _, condition := range expected {
@@ -443,7 +443,7 @@ func findConditionInList(t *testing.T, conditions []metav1.Condition, condName, 
 		}
 	}
 
-	t.Logf("%s was not in conditions list", condName)
+	t.Logf("%s was not in conditions list %+v", condName, conditions)
 	return false
 }
 
