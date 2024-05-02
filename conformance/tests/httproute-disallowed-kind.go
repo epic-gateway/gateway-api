@@ -45,7 +45,7 @@ var HTTPRouteDisallowedKind = suite.ConformanceTest{
 		gwName := types.NamespacedName{Name: "tlsroutes-only", Namespace: "gateway-conformance-infra"}
 
 		t.Run("Route should not have Parents set in status", func(t *testing.T) {
-			kubernetes.HTTPRouteMustHaveNoAcceptedParents(t, suite.Client, routeName, 60)
+			kubernetes.HTTPRouteMustHaveNoAcceptedParents(t, suite.Client, routeName, suite.Timeout)
 		})
 
 		t.Run("Gateway should have 0 Routes attached", func(t *testing.T) {

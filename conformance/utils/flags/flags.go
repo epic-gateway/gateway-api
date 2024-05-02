@@ -27,4 +27,5 @@ var (
 	GatewayClassName     = flag.String("gateway-class", "gateway-conformance", "Name of GatewayClass to use for tests")
 	ShowDebug            = flag.Bool("debug", false, "Whether to print debug logs")
 	CleanupBaseResources = flag.Bool("cleanup-base-resources", true, "Whether to cleanup base test resources after the run")
+	Timeout              = flag.Int("timeout", 60, "How long to wait for individual conditions to be valid")
 )

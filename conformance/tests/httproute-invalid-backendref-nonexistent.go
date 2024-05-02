@@ -50,7 +50,7 @@ var HTTPRouteInvalidNonExistentBackendRef = suite.ConformanceTest{
 				Reason: string(v1alpha2.RouteReasonBackendNotFound),
 			}
 
-			kubernetes.HTTPRouteMustHaveCondition(t, suite.Client, routeNN, gwNN, resolvedRefsCond, 60)
+			kubernetes.HTTPRouteMustHaveCondition(t, suite.Client, routeNN, gwNN, resolvedRefsCond, suite.Timeout)
 		})
 
 		t.Run("HTTP Request to invalid nonexistent backend receive a 500", func(t *testing.T) {

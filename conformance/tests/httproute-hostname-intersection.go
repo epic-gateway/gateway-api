@@ -204,7 +204,7 @@ var HTTPRouteHostnameIntersection = suite.ConformanceTest{
 				},
 			}}
 
-			kubernetes.HTTPRouteMustHaveParents(t, suite.Client, routeName, parents, true, 60)
+			kubernetes.HTTPRouteMustHaveParents(t, suite.Client, routeName, parents, true, suite.Timeout)
 
 			testCases := []http.ExpectedResponse{
 				{

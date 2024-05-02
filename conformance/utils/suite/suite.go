@@ -63,6 +63,7 @@ type ConformanceTestSuite struct {
 	Applier           kubernetes.Applier
 	ExemptFeatures    []ExemptFeature
 	SupportedFeatures []SupportedFeature
+	Timeout           int
 }
 
 // Options can be used to initialize a ConformanceTestSuite.
@@ -86,6 +87,7 @@ type Options struct {
 	CleanupBaseResources bool
 	ExemptFeatures       []ExemptFeature
 	SupportedFeatures    []SupportedFeature
+	Timeout              int
 }
 
 // New returns a new ConformanceTestSuite.
@@ -108,6 +110,7 @@ func New(s Options) *ConformanceTestSuite {
 		},
 		ExemptFeatures:    s.ExemptFeatures,
 		SupportedFeatures: s.SupportedFeatures,
+		Timeout:           s.Timeout,
 	}
 
 	// apply defaults
@@ -186,7 +189,8 @@ func (test *ConformanceTest) Run(t *testing.T, suite *ConformanceTestSuite) {
 
 	for _, manifestLocation := range test.Manifests {
 		t.Logf("Applying %s", manifestLocation)
-		suite.Applier.MustApplyWithCleanup(t, suite.Client, manifestLocation, suite.GatewayClassName, true)
+		suite.Applier.MustApplyWithCleanup(t, suite.Client, manifestLocation, suite.GatewayClassName, suite.Cleanup)
+		// suite.Applier.MustApplyWithCleanup(t, suite.Client, manifestLocation, suite.GatewayClassName, true)
 	}
 
 	test.Test(t, suite)

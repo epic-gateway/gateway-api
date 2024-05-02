@@ -48,6 +48,7 @@ func TestConformance(t *testing.T) {
 		GatewayClassName:     *flags.GatewayClassName,
 		Debug:                *flags.ShowDebug,
 		CleanupBaseResources: *flags.CleanupBaseResources,
+		Timeout:              *flags.Timeout,
 		SupportedFeatures: []suite.SupportedFeature{
 			suite.SupportReferenceGrant,
 		},
