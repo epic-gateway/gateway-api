@@ -37,7 +37,7 @@ var GatewaySecretReferenceGrantAllInNamespace = suite.ConformanceTest{
 	Features:    []suite.SupportedFeature{suite.SupportReferenceGrant},
 	Manifests:   []string{"tests/gateway-secret-reference-grant-all-in-namespace.yaml"},
 	Test: func(t *testing.T, s *suite.ConformanceTestSuite) {
-		gwNN := types.NamespacedName{Name: "gateway-secret-reference-grant", Namespace: "gateway-conformance-infra"}
+		gwNN := types.NamespacedName{Name: "gateway-secret-reference-grant-all", Namespace: "gateway-conformance-infra"}
 
 		t.Run("Gateway listener should have a true ResolvedRefs condition and a true Programmed condition", func(t *testing.T) {
 			listeners := []v1beta1.ListenerStatus{{
